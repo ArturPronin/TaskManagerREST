@@ -116,7 +116,7 @@ public class TaskController extends HttpServlet {
         }
     }
 
-    private void handleGetAllTasks(HttpServletResponse resp) {
+    void handleGetAllTasks(HttpServletResponse resp) {
         try {
             List<TaskDTO> tasks = taskService.getAllTasks();
             writeResponse(resp, tasks);
@@ -148,7 +148,7 @@ public class TaskController extends HttpServlet {
         }
     }
 
-    private void writeResponse(HttpServletResponse resp, Object data) throws IOException {
+    void writeResponse(HttpServletResponse resp, Object data) throws IOException {
         resp.setContentType("application/json");
         objectMapper.writeValue(resp.getOutputStream(), data);
     }

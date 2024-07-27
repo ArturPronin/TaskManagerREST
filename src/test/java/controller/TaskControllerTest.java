@@ -16,6 +16,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockedStatic;
 import org.mockito.Mockito;
+import org.slf4j.Logger;
 import service.TaskService;
 
 import java.io.ByteArrayInputStream;
@@ -38,12 +39,14 @@ public class TaskControllerTest {
     private TaskService taskService;
     private ObjectMapper objectMapper;
     private TaskController taskController;
+    private Logger mockLogger;
 
     @BeforeEach
     public void setUp() {
         taskService = Mockito.mock(TaskService.class);
         objectMapper = new ObjectMapper();
         taskController = new TaskController(taskService, objectMapper);
+        mockLogger = mock(Logger.class);
     }
 
     @Test
@@ -551,9 +554,20 @@ public class TaskControllerTest {
         HttpServletResponse resp = mock(HttpServletResponse.class);
         IOException ioException = new IOException("Test IOException");
 
-        taskController.handleIOException(ioException,resp);
+        taskController.handleIOException(ioException, resp);
 
         verify(resp).sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "An internal error occurred");
     }
 
+    @Test
+    void testDoPostIOException() throws IOException {
+        HttpServletRequest req = mock(HttpServletRequest.class);
+        HttpServletResponse resp = mock(HttpServletResponse.class);
+
+        when(req.getInputStream()).thenThrow(new IOException("Test IOException"));
+
+        taskController.doPost(req, resp);
+
+        verify(resp).sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "An error occurred while processing the request.");
+    }
 }
