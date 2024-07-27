@@ -6,6 +6,8 @@ import exception.DatabaseOperationException;
 import exception.SQLExceptionWrapper;
 import factory.Factory;
 import factory.impl.TaskFactoryImpl;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -23,6 +25,7 @@ public class TaskDAOImpl implements TaskDAO {
     private static final String COLUMN_ASSIGNED_USER_ID = "assigned_user_id";
     private final Connection connection;
     private final Factory<Task> taskFactory = new TaskFactoryImpl();
+    private static final Logger LOGGER = LoggerFactory.getLogger(TaskDAOImpl.class);
 
     public TaskDAOImpl(Connection connection) {
         this.connection = connection;
@@ -49,7 +52,6 @@ public class TaskDAOImpl implements TaskDAO {
                 }
             }
         } catch (SQLException e) {
-            e.printStackTrace();
             throw new SQLExceptionWrapper("Error creating task", e);
         }
     }
@@ -70,7 +72,6 @@ public class TaskDAOImpl implements TaskDAO {
                 }
             }
         } catch (SQLException e) {
-            e.printStackTrace();
             throw new DatabaseOperationException(DATABASE_ERROR_MESSAGE, e);
         }
         return null;
@@ -86,7 +87,6 @@ public class TaskDAOImpl implements TaskDAO {
                 tasksSetList(resultSet, tasks, taskFactory);
             }
         } catch (SQLException e) {
-            e.printStackTrace();
             throw new DatabaseOperationException(DATABASE_ERROR_MESSAGE, e);
         }
         return tasks;
@@ -161,30 +161,24 @@ public class TaskDAOImpl implements TaskDAO {
         }
     }
 
+
     @Override
     public void delete(Long id) {
         String deleteUserTasksSQL = "DELETE FROM user_tasks WHERE task_id = ?";
         String deleteTaskSQL = "DELETE FROM tasks WHERE id = ?";
-
         boolean commitSuccessful = false;
-
         try {
             connection.setAutoCommit(false);
-
-            
             try (PreparedStatement deleteUserTasksStmt = connection.prepareStatement(deleteUserTasksSQL)) {
                 deleteUserTasksStmt.setLong(1, id);
                 deleteUserTasksStmt.executeUpdate();
             }
-
-            
             try (PreparedStatement deleteTaskStmt = connection.prepareStatement(deleteTaskSQL)) {
                 deleteTaskStmt.setLong(1, id);
                 deleteTaskStmt.executeUpdate();
             }
-
             connection.commit();
-            commitSuccessful = true; 
+            commitSuccessful = true;
         } catch (SQLException e) {
             handleDatabaseError(e);
         } finally {
@@ -206,24 +200,22 @@ public class TaskDAOImpl implements TaskDAO {
             if (connection != null) {
                 connection.rollback();
             }
-        } catch (SQLException rollbackException) {
-            rollbackException.printStackTrace();
-            
+        } catch (SQLException ex) {
+            LOGGER.error("Error rollback task", e);
         }
-        e.printStackTrace();
-        
+        LOGGER.error("Error handle database", e);
         throw new DatabaseOperationException("Database error occurred", e);
     }
 
     public void restoreAutoCommitState(boolean commitSuccessful) {
         try {
             if (!commitSuccessful) {
-                connection.rollback(); 
+                connection.rollback();
             }
             connection.setAutoCommit(true);
         } catch (SQLException e) {
-            e.printStackTrace();
-            
+            LOGGER.error("Error restore auto commit", e);
+
         }
     }
 

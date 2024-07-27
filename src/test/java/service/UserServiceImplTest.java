@@ -59,6 +59,7 @@ public class UserServiceImplTest {
         assertNotNull(capturedUser);
         assertEquals("User 1", capturedUser.getName());
     }
+
     @Test
     public void testUpdateUser() {
         UserDTO userDTO = new UserDTO();
@@ -78,6 +79,7 @@ public class UserServiceImplTest {
         assertEquals(1L, userCaptor.getValue().getId());
         assertEquals("Updated Name", userCaptor.getValue().getName());
     }
+
     @Test
     public void testGetUserById() {
         Long userId = 1L;
@@ -147,6 +149,7 @@ public class UserServiceImplTest {
         verify(userDAO, times(1)).getTasksByUserId(1L);
         verify(userDAO, times(1)).getTasksByUserId(2L);
     }
+
     @Test
     public void testDeleteUser() {
         Long userId = 1L;
@@ -198,6 +201,7 @@ public class UserServiceImplTest {
 
         verify(userDAO, times(1)).getTasksByUserId(userId);
     }
+
     @Test
     public void testCreateUserWithNullDTO() {
 

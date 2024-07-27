@@ -1,9 +1,12 @@
 package controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import config.DatabaseConfig;
 import dto.TaskDTO;
 import entity.Task;
+import exception.InitializationException;
 import exception.ServiceException;
+import factory.impl.TaskControllerFactory;
 import jakarta.servlet.*;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -11,38 +14,36 @@ import mapper.TaskMapper;
 import mapper.impl.TaskMapperImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.MockedStatic;
+import org.mockito.Mockito;
 import service.TaskService;
-import service.impl.TaskServiceImpl;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.lang.reflect.Field;
+import java.sql.SQLException;
 import java.util.Arrays;
 import java.util.List;
 
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 public class TaskControllerTest {
 
-    private TaskController taskController;
     private TaskService taskService;
     private ObjectMapper objectMapper;
+    private TaskController taskController;
 
     @BeforeEach
-    public void setUp() throws ServletException {
-        taskService = mock(TaskService.class);
+    public void setUp() {
+        taskService = Mockito.mock(TaskService.class);
         objectMapper = new ObjectMapper();
-        taskController = new TaskController() {
-            @Override
-            public void init() {
-                this.taskService = TaskControllerTest.this.taskService;
-                this.objectMapper = TaskControllerTest.this.objectMapper;
-            }
-        };
-        taskController.init();
+        taskController = new TaskController(taskService, objectMapper);
     }
 
     @Test
@@ -209,14 +210,32 @@ public class TaskControllerTest {
     }
 
     @Test
-    void testTaskControllerConstructor() {
-        TaskServiceImpl taskService = mock(TaskServiceImpl.class);
+    void testTaskControllerConstructor() throws NoSuchFieldException, IllegalAccessException {
+        TaskService taskService = mock(TaskService.class);
         ObjectMapper objectMapper = new ObjectMapper();
         TaskController taskController = new TaskController(taskService, objectMapper);
+        TaskController taskControllerEmptyConstructor = new TaskController();
 
         assertNotNull(taskController);
-        assertEquals(taskService, taskController.taskService);
-        assertEquals(objectMapper, taskController.objectMapper);
+
+        Field taskServiceField = TaskController.class.getDeclaredField("taskService");
+        Field objectMapperField = TaskController.class.getDeclaredField("objectMapper");
+        taskServiceField.setAccessible(true);
+        objectMapperField.setAccessible(true);
+
+        assertEquals(taskService, taskServiceField.get(taskController));
+        assertEquals(objectMapper, objectMapperField.get(taskController));
+
+        assertEquals(TaskController.class, taskControllerEmptyConstructor.getClass());
+    }
+
+    @Test
+    public void testTaskControllerConstructorWithSQLException() {
+        try (MockedStatic<DatabaseConfig> mockedConfig = Mockito.mockStatic(DatabaseConfig.class)) {
+            mockedConfig.when(DatabaseConfig::getConnection)
+                    .thenThrow(new SQLException("Database error"));
+            assertThrows(InitializationException.class, TaskControllerFactory::createTaskController);
+        }
     }
 
     @Test
@@ -300,6 +319,7 @@ public class TaskControllerTest {
 
         verify(response).sendError(HttpServletResponse.SC_BAD_REQUEST, "Invalid TaskDTO");
     }
+
     @Test
     void testDoPutInvalidTaskDTO() throws ServletException, IOException {
         HttpServletRequest request = mock(HttpServletRequest.class);
@@ -434,20 +454,20 @@ public class TaskControllerTest {
     void testTaskMapperPutNull() {
         TaskMapper taskMapper = new TaskMapperImpl();
         Task task = null;
-        assertEquals(null, taskMapper.toDTO(task));
+        assertNull(taskMapper.toDTO(task));
 
         Task task2 = new Task(2L, "", "", null);
-        assertEquals(null, taskMapper.toDTO(task2));
+        assertNull(taskMapper.toDTO(task2));
 
         TaskDTO taskDTO = null;
-        assertEquals(null, taskMapper.toEntity(taskDTO));
+        assertNull(taskMapper.toEntity(taskDTO));
 
         TaskDTO taskDTO2 = new TaskDTO(2L, "", "", null);
-        assertEquals(null, taskMapper.toEntity(taskDTO2));
+        assertNull(taskMapper.toEntity(taskDTO2));
     }
 
     @Test
-    public void testHandleDeleteTask_Success() throws IOException {
+    public void testHandleDeleteTaskSuccess() throws IOException {
         HttpServletRequest req = mock(HttpServletRequest.class);
         HttpServletResponse resp = mock(HttpServletResponse.class);
         when(req.getPathInfo()).thenReturn("/1");
@@ -459,7 +479,7 @@ public class TaskControllerTest {
     }
 
     @Test
-    public void testHandleDeleteTask_InvalidPath() throws IOException {
+    public void testHandleDeleteTaskInvalidPath() throws IOException {
         HttpServletRequest req = mock(HttpServletRequest.class);
         HttpServletResponse resp = mock(HttpServletResponse.class);
         when(req.getPathInfo()).thenReturn("/");
@@ -470,7 +490,7 @@ public class TaskControllerTest {
     }
 
     @Test
-    public void testHandleDeleteTask_InvalidIdFormat() throws IOException {
+    public void testHandleDeleteTaskInvalidIdFormat() throws IOException {
         HttpServletRequest req = mock(HttpServletRequest.class);
         HttpServletResponse resp = mock(HttpServletResponse.class);
         when(req.getPathInfo()).thenReturn("/invalid");
@@ -481,7 +501,7 @@ public class TaskControllerTest {
     }
 
     @Test
-    public void testHandleDeleteTask_ServiceException() throws IOException {
+    public void testHandleDeleteTaskServiceException() throws IOException {
         HttpServletRequest req = mock(HttpServletRequest.class);
         HttpServletResponse resp = mock(HttpServletResponse.class);
         when(req.getPathInfo()).thenReturn("/1");
@@ -493,7 +513,7 @@ public class TaskControllerTest {
     }
 
     @Test
-    public void testHandleGetTaskById_InvalidPath() throws IOException {
+    public void testHandleGetTaskByIdInvalidPath() throws IOException {
         HttpServletRequest req = mock(HttpServletRequest.class);
         HttpServletResponse resp = mock(HttpServletResponse.class);
         when(req.getPathInfo()).thenReturn("/");
@@ -504,10 +524,9 @@ public class TaskControllerTest {
     }
 
     @Test
-    public void testHandleGetTaskById_InvalidIdFormat() throws IOException {
-        HttpServletRequest req = mock(HttpServletRequest.class);
+    void testHandleGetTaskByIdInvalidIdFormat() throws IOException {
         HttpServletResponse resp = mock(HttpServletResponse.class);
-        when(req.getPathInfo()).thenReturn("/invalid");
+        when(resp.getOutputStream()).thenThrow(new IOException("OutputStream error"));
 
         taskController.handleGetTaskById("/invalid", resp);
 
@@ -515,15 +534,26 @@ public class TaskControllerTest {
     }
 
     @Test
-    public void testHandleGetTaskById_TaskNotFound() throws IOException {
+    void testHandleGetTaskByIdTaskNotFound() throws IOException {
         HttpServletRequest req = mock(HttpServletRequest.class);
         HttpServletResponse resp = mock(HttpServletResponse.class);
+
         when(req.getPathInfo()).thenReturn("/1");
         when(taskService.getTaskById(1L)).thenReturn(null);
 
         taskController.handleGetTaskById("/1", resp);
 
         verify(resp).sendError(HttpServletResponse.SC_NOT_FOUND);
+    }
+
+    @Test
+    void testHandleIOException() throws IOException {
+        HttpServletResponse resp = mock(HttpServletResponse.class);
+        IOException ioException = new IOException("Test IOException");
+
+        taskController.handleIOException(ioException,resp);
+
+        verify(resp).sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "An internal error occurred");
     }
 
 }

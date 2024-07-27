@@ -15,9 +15,9 @@ import java.util.List;
 
 public class UserServiceImpl implements UserService {
 
-    private UserDAO userDAO;
-    private UserMapper userMapper = new UserMapperImpl();
-    private TaskMapper taskMapper = new TaskMapperImpl();
+    private final UserDAO userDAO;
+    private final UserMapper userMapper = new UserMapperImpl();
+    private final TaskMapper taskMapper = new TaskMapperImpl();
 
     public UserServiceImpl(UserDAO userDAO) {
         this.userDAO = userDAO;

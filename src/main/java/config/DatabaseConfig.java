@@ -8,11 +8,12 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.sql.Connection;
 import java.sql.SQLException;
+import java.util.Objects;
 import java.util.Properties;
 
 public class DatabaseConfig {
-    private static final String ROOT_PATH = Thread.currentThread().getContextClassLoader().getResource("").getPath().replace("%20", " ");
-    private static final String DB_CONFIG_PATH = ROOT_PATH + "database.properties";
+    private static final String ROOT_PATH;
+    private static final String DB_CONFIG_PATH;
     private static final Properties PROPERTIES = new Properties();
     private static final HikariConfig HIKARI_CONFIG = new HikariConfig();
     private static final HikariDataSource HIKARI_DATA_SOURCE;
@@ -20,11 +21,11 @@ public class DatabaseConfig {
     private static final String USERNAME;
     private static final String PASSWORD;
 
-    private DatabaseConfig() {
-
-    }
+    private DatabaseConfig() {}
 
     static {
+        ROOT_PATH = Objects.requireNonNull(Thread.currentThread().getContextClassLoader().getResource("")).getPath().replace("%20", " ");
+        DB_CONFIG_PATH = ROOT_PATH + "database.properties";
         try {
             PROPERTIES.load(new FileInputStream(DB_CONFIG_PATH));
         } catch (IOException e) {

@@ -1,10 +1,14 @@
 package controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import config.DatabaseConfig;
 import dto.TaskDTO;
 import dto.UserDTO;
 import entity.Task;
 import entity.User;
+import exception.InitializationException;
+import exception.ServiceException;
+import factory.impl.UserControllerFactory;
 import jakarta.servlet.*;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -12,42 +16,41 @@ import mapper.UserMapper;
 import mapper.impl.UserMapperImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.testcontainers.shaded.com.fasterxml.jackson.core.JsonGenerator;
+import org.mockito.MockedStatic;
+import org.mockito.Mockito;
 import service.UserService;
 import service.impl.UserServiceImpl;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.sql.SQLException;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.Mockito.*;
 
 public class UserControllerTest {
 
-    private UserController userController;
     private UserService userService;
     private ObjectMapper objectMapper;
+    private UserController userController;
+    private HttpServletResponse resp;
 
     @BeforeEach
-    public void setUp() throws ServletException {
-
-        userService = mock(UserService.class);
+    public void setUp() {
+        userService = Mockito.mock(UserService.class);
         objectMapper = new ObjectMapper();
-        userController = new UserController() {
-            @Override
-            public void init() {
-                this.userService = UserControllerTest.this.userService;
-                this.objectMapper = UserControllerTest.this.objectMapper;
-            }
-        };
-        userController.init();
+        userController = new UserController(userService, objectMapper);
+        resp = Mockito.mock(HttpServletResponse.class);
     }
+
     @Test
     public void testDoGetAllUsers() throws Exception {
         HttpServletRequest request = mock(HttpServletRequest.class);
@@ -174,6 +177,7 @@ public class UserControllerTest {
         verify(userService).createUser(any(UserDTO.class));
         verify(response).setStatus(HttpServletResponse.SC_CREATED);
     }
+
     @Test
     void testDoPutUpdateUser() throws Exception {
         HttpServletRequest request = mock(HttpServletRequest.class);
@@ -219,6 +223,7 @@ public class UserControllerTest {
         verify(userService).updateUser(any(UserDTO.class));
         verify(response).setStatus(HttpServletResponse.SC_NO_CONTENT);
     }
+
     @Test
     public void testDoDeleteUser() throws Exception {
         HttpServletRequest request = mock(HttpServletRequest.class);
@@ -231,6 +236,7 @@ public class UserControllerTest {
         verify(userService).deleteUser(1L);
         verify(response).setStatus(HttpServletResponse.SC_NO_CONTENT);
     }
+
     @Test
     public void testDoGetInvalidPath() throws Exception {
         HttpServletRequest request = mock(HttpServletRequest.class);
@@ -345,15 +351,31 @@ public class UserControllerTest {
     }
 
     @Test
-    void testUserControllerConstructor() {
+    void testUserControllerConstructor() throws NoSuchFieldException, IllegalAccessException {
         UserServiceImpl userService = mock(UserServiceImpl.class);
         ObjectMapper objectMapper = new ObjectMapper();
-
         UserController userController = new UserController(userService, objectMapper);
+        UserController userControllerEmptyConstructor = new UserController();
 
         assertNotNull(userController);
-        assertEquals(userService, userController.userService);
-        assertEquals(objectMapper, userController.objectMapper);
+
+        Field userServiceField = UserController.class.getDeclaredField("userService");
+        Field objectMapperField = UserController.class.getDeclaredField("objectMapper");
+        userServiceField.setAccessible(true);
+        objectMapperField.setAccessible(true);
+
+        assertEquals(userService, userServiceField.get(userController));
+        assertEquals(objectMapper, objectMapperField.get(userController));
+
+        assertEquals(UserController.class, userControllerEmptyConstructor.getClass());
+    }
+
+    @Test
+    public void testUserControllerConstructorWithSQLException() {
+        try (MockedStatic<DatabaseConfig> mockedConfig = Mockito.mockStatic(DatabaseConfig.class)) {
+            mockedConfig.when(DatabaseConfig::getConnection).thenThrow(new SQLException("Database error"));
+            assertThrows(InitializationException.class, UserControllerFactory::createUserController);
+        }
     }
 
     @Test
@@ -404,6 +426,7 @@ public class UserControllerTest {
 
         verify(response).sendError(HttpServletResponse.SC_BAD_REQUEST, "Invalid Path");
     }
+
     @Test
     public void testDoPutInvalidUserDTO() throws Exception {
         HttpServletRequest request = mock(HttpServletRequest.class);
@@ -426,22 +449,6 @@ public class UserControllerTest {
         userController.doDelete(request, response);
 
         verify(response).sendError(HttpServletResponse.SC_BAD_REQUEST, "Path cannot be null or empty");
-    }
-
-    @Test
-    public void testInitWithSQLException() throws Exception {
-        UserController userController = new UserController() {
-            @Override
-            public void init() throws ServletException {
-                try {
-                    throw new SQLException("Database error");
-                } catch (SQLException e) {
-                    throw new RuntimeException(e);
-                }
-            }
-        };
-
-        assertThrows(RuntimeException.class, () -> userController.init());
     }
 
     @Test
@@ -512,11 +519,7 @@ public class UserControllerTest {
         assertEquals(name, user.getName());
         assertEquals(tasks, user.getTasks());
 
-        String expectedToString = "User{" +
-                "id=" + id +
-                ", name='" + name + '\'' +
-                ", tasks=" + tasks +
-                '}';
+        String expectedToString = "User{" + "id=" + id + ", name='" + name + '\'' + ", tasks=" + tasks + '}';
 
         assertEquals(expectedToString, user.toString());
     }
@@ -535,11 +538,7 @@ public class UserControllerTest {
         assertEquals(name, userDTO.getName());
         assertEquals(tasks, userDTO.getTasks());
 
-        String expectedToString = "UserDTO{" +
-                "id=" + id +
-                ", name='" + name + '\'' +
-                ", tasks=" + tasks +
-                '}';
+        String expectedToString = "UserDTO{" + "id=" + id + ", name='" + name + '\'' + ", tasks=" + tasks + '}';
 
         assertEquals(expectedToString, userDTO.toString());
     }
@@ -596,10 +595,8 @@ public class UserControllerTest {
         verify(resp).sendError(HttpServletResponse.SC_NOT_FOUND, "Not Found");
     }
 
-
-
     @Test
-    public void testHandleGetUserById_UserNotFound() throws IOException {
+    public void testHandleGetUserByIdUserNotFound() throws IOException {
         HttpServletResponse resp = mock(HttpServletResponse.class);
         when(userService.getUserById(1L)).thenReturn(null);
 
@@ -609,7 +606,7 @@ public class UserControllerTest {
     }
 
     @Test
-    public void testHandleGetUserById_InvalidPath() throws IOException {
+    public void testHandleGetUserByIdInvalidPath() throws IOException {
         HttpServletResponse resp = mock(HttpServletResponse.class);
 
         userController.handleGetUserById("/", resp);
@@ -618,7 +615,7 @@ public class UserControllerTest {
     }
 
     @Test
-    public void testHandleGetUserById_InvalidIdFormat() throws IOException {
+    public void testHandleGetUserByIdInvalidIdFormat() throws IOException {
         HttpServletResponse resp = mock(HttpServletResponse.class);
 
         userController.handleGetUserById("/invalid", resp);
@@ -626,4 +623,40 @@ public class UserControllerTest {
         verify(resp).sendError(HttpServletResponse.SC_BAD_REQUEST, "Invalid user ID format");
     }
 
+    @Test
+    void testHandleJsonException() throws IOException {
+        Exception exception = new RuntimeException("Test exception");
+        userController.handleJsonException(exception, resp);
+        verify(resp).sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Error processing JSON");
+    }
+
+    @Test
+    void testHandleIOException() throws IOException {
+        IOException ioException = new IOException("Test IO exception");
+        userController.handleIOException(ioException, resp);
+        verify(resp).sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Error handling request");
+    }
+
+    @Test
+    void testDoDeleteWithInvalidUserIdFormat() throws IOException, ServletException {
+
+        HttpServletRequest req = Mockito.mock(HttpServletRequest.class);
+        HttpServletResponse resp = Mockito.mock(HttpServletResponse.class);
+
+        when(req.getPathInfo()).thenReturn("/invalid-id");
+        userController.doDelete(req, resp);
+        verify(resp).sendError(HttpServletResponse.SC_BAD_REQUEST, "Invalid user ID format");
+    }
+
+    @Test
+    void testDoDeleteWithServiceException() throws IOException, ServletException {
+
+        HttpServletRequest req = Mockito.mock(HttpServletRequest.class);
+        HttpServletResponse resp = Mockito.mock(HttpServletResponse.class);
+
+        when(req.getPathInfo()).thenReturn("/1");
+        doThrow(new ServiceException("Service error")).when(userService).deleteUser(anyLong());
+        userController.doDelete(req, resp);
+        verify(resp).sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Failed to delete user");
+    }
 }

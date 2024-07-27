@@ -10,6 +10,8 @@ import exception.UserNotFoundException;
 import factory.Factory;
 import factory.impl.TaskFactoryImpl;
 import factory.impl.UserFactoryImpl;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.sql.*;
 import java.util.ArrayList;
@@ -17,9 +19,10 @@ import java.util.List;
 
 public class UserDAOImpl implements UserDAO {
 
-    private Connection connection;
-    private Factory<User> userFactory = new UserFactoryImpl();
-    private Factory<Task> taskFactory = new TaskFactoryImpl();
+    private final Connection connection;
+    private final Factory<User> userFactory = new UserFactoryImpl();
+    private final Factory<Task> taskFactory = new TaskFactoryImpl();
+    private static final Logger LOGGER = LoggerFactory.getLogger(UserDAOImpl.class);
 
     public UserDAOImpl(Connection connection) {
         this.connection = connection;
@@ -65,7 +68,7 @@ public class UserDAOImpl implements UserDAO {
                 }
             }
         } catch (SQLException e) {
-            e.printStackTrace();
+            LOGGER.error("Error find by ID", e);
         }
         return null;
     }
@@ -73,22 +76,19 @@ public class UserDAOImpl implements UserDAO {
     @Override
     public List<User> findAll() {
         List<User> users = new ArrayList<>();
-
         String sql = "SELECT id, name FROM users";
         try (PreparedStatement statement = connection.prepareStatement(sql);
              ResultSet resultSet = statement.executeQuery()) {
             while (resultSet.next()) {
                 User user = userFactory.create();
-
                 user.setId(resultSet.getLong("id"));
                 user.setName(resultSet.getString("name"));
-
                 List<Task> tasks = getTasksByUserId(user.getId());
                 user.setTasks(tasks);
                 users.add(user);
             }
         } catch (SQLException e) {
-            e.printStackTrace();
+            LOGGER.error("Error find all", e);
         }
         return users;
     }
@@ -145,6 +145,7 @@ public class UserDAOImpl implements UserDAO {
             throw new TaskAssignmentException("Error assigning task to user", e);
         }
     }
+
     public List<Task> getTasksByUserId(Long userId) {
         List<Task> tasks = new ArrayList<>();
         String sql = "SELECT t.id, t.title, t.description, t.assigned_user_id FROM tasks t JOIN user_tasks ut ON t.id = ut.task_id WHERE ut.user_id = ?";
@@ -156,7 +157,6 @@ public class UserDAOImpl implements UserDAO {
                 }
             }
         } catch (SQLException e) {
-
             throw new TaskRetrievalException("Error retrieving tasks for user ID: " + userId, e);
         }
         return tasks;

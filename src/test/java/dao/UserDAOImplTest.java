@@ -18,45 +18,84 @@ import static org.mockito.Mockito.*;
 @Testcontainers
 public class UserDAOImplTest {
 
-    private static final PostgreSQLContainer<?> POSTGRESQL_CONTAINER = new PostgreSQLContainer<>("postgres:16");
-    private UserDAO userDAO;
-    private TaskDAO taskDAO;
-    private Connection connection;
     private static PostgreSQLContainer<?> postgresContainer;
+    private TaskDAO taskDAO;
+    private static Connection connection;
+    private UserDAO userDAO;
 
     @BeforeAll
     public static void setUpBeforeClass() {
         postgresContainer = new PostgreSQLContainer<>("postgres:16")
-                .withDatabaseName("test_db")
                 .withUsername("test_user")
                 .withPassword("test_password");
         postgresContainer.start();
+
+        try (Connection conn = DriverManager.getConnection(
+                postgresContainer.getJdbcUrl(),
+                postgresContainer.getUsername(),
+                postgresContainer.getPassword())) {
+
+            try (Statement statement = conn.createStatement()) {
+                
+                try {
+                    statement.execute("DROP DATABASE IF EXISTS test_db");
+                } catch (SQLException e) {
+
+                }
+                statement.execute("CREATE DATABASE test_db");
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     @AfterAll
     public static void tearDownAfterClass() {
         if (postgresContainer != null) {
+            try (Connection conn = DriverManager.getConnection(
+                    postgresContainer.getJdbcUrl(),
+                    postgresContainer.getUsername(),
+                    postgresContainer.getPassword())) {
+
+                try (Statement statement = conn.createStatement()) {
+                    statement.execute("DROP DATABASE IF EXISTS test_db");
+                }
+            } catch (SQLException e) {
+                throw new RuntimeException(e);
+            }
             postgresContainer.stop();
         }
     }
 
     @BeforeEach
     public void setUp() throws SQLException {
-        POSTGRESQL_CONTAINER.start();
+        postgresContainer.start();
 
         connection = DriverManager.getConnection(
-                POSTGRESQL_CONTAINER.getJdbcUrl(),
-                POSTGRESQL_CONTAINER.getUsername(),
-                POSTGRESQL_CONTAINER.getPassword()
+                postgresContainer.getJdbcUrl(),
+                postgresContainer.getUsername(),
+                postgresContainer.getPassword()
         );
 
-        userDAO = new UserDAOImpl(connection);
         taskDAO = new TaskDAOImpl(connection);
+        userDAO = new UserDAOImpl(connection);
 
         try (Statement statement = connection.createStatement()) {
             statement.execute("CREATE TABLE users (id BIGSERIAL PRIMARY KEY, name VARCHAR(255))");
             statement.execute("CREATE TABLE tasks (id BIGSERIAL PRIMARY KEY, title VARCHAR(255), description TEXT, assigned_user_id BIGINT)");
             statement.execute("CREATE TABLE user_tasks (user_id BIGINT REFERENCES users(id), task_id BIGINT REFERENCES tasks(id), PRIMARY KEY(user_id, task_id))");
+        }
+    }
+
+    @AfterEach
+    public void tearDown() throws SQLException {
+        try (Statement statement = connection.createStatement()) {
+            statement.execute("DROP TABLE IF EXISTS user_tasks");
+            statement.execute("DROP TABLE IF EXISTS tasks");
+            statement.execute("DROP TABLE IF EXISTS users");
+        }
+        if (connection != null && !connection.isClosed()) {
+            connection.close();
         }
     }
 
@@ -189,19 +228,6 @@ public class UserDAOImplTest {
         assertTrue(users.isEmpty(), "User list should be empty");
     }
 
-    @AfterEach
-    public void tearDown() throws SQLException {
-        try (Statement statement = connection.createStatement()) {
-            statement.execute("DROP TABLE IF EXISTS user_tasks");
-            statement.execute("DROP TABLE IF EXISTS tasks");
-            statement.execute("DROP TABLE IF EXISTS users");
-        }
-        if (connection != null && !connection.isClosed()) {
-            connection.close();
-        }
-        POSTGRESQL_CONTAINER.stop();
-    }
-
     @Test
     public void testAssignTaskToUserWhenTaskAlreadyAssigned() throws SQLException {
         Connection connection = mock(Connection.class);
@@ -274,6 +300,7 @@ public class UserDAOImplTest {
         assertEquals("Database error while deleting user", thrown.getMessage());
         assertEquals(sqlException, thrown.getCause());
     }
+
     @Test
     public void testUpdateUserSQLException() throws SQLException {
         Connection connection = mock(Connection.class);

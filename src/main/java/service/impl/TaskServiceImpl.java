@@ -11,8 +11,8 @@ import java.util.List;
 
 public class TaskServiceImpl implements TaskService {
 
-    private TaskDAO taskDAO;
-    private TaskMapper taskMapper = new TaskMapperImpl();
+    private final TaskDAO taskDAO;
+    private final TaskMapper taskMapper = new TaskMapperImpl();
 
     public TaskServiceImpl(TaskDAO taskDAO) {
         this.taskDAO = taskDAO;
@@ -43,6 +43,7 @@ public class TaskServiceImpl implements TaskService {
                 .map(taskMapper::toDTO)
                 .toList();
     }
+
     public void updateTask(TaskDTO taskDTO) {
         if (taskDTO.getId() == null) {
             throw new IllegalArgumentException("TaskDTO ID cannot be null");

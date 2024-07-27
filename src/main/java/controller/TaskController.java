@@ -1,48 +1,36 @@
 package controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import config.DatabaseConfig;
-import dao.TaskDAO;
-import dao.impl.TaskDAOImpl;
 import dto.TaskDTO;
-import exception.InitializationException;
 import exception.ServiceException;
-import jakarta.servlet.ServletException;
+import factory.impl.TaskControllerFactory;
 import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import service.TaskService;
-import service.impl.TaskServiceImpl;
 
 import java.io.IOException;
-import java.sql.Connection;
-import java.sql.SQLException;
 import java.util.List;
 
 @WebServlet("/tasks/*")
 public class TaskController extends HttpServlet {
 
-    transient TaskService taskService;
-    ObjectMapper objectMapper;
+    private final transient TaskService taskService;
+    private final ObjectMapper objectMapper;
+    private static final Logger LOGGER = LoggerFactory.getLogger(TaskController.class);
 
-    public TaskController(TaskServiceImpl taskService, ObjectMapper objectMapper) {
+    public TaskController(TaskService taskService, ObjectMapper objectMapper) {
         this.taskService = taskService;
         this.objectMapper = objectMapper;
     }
 
     public TaskController() {
-    }
-    @Override
-    public void init() {
-        try {
-            Connection connection = DatabaseConfig.getConnection();
-            TaskDAO taskDAO = new TaskDAOImpl(connection);
-            taskService = new TaskServiceImpl(taskDAO);
-            objectMapper = new ObjectMapper();
-        } catch (SQLException e) {
-            throw new InitializationException("Failed to initialize components", e);
-        }
+        TaskController controller = TaskControllerFactory.createTaskController();
+        this.taskService = controller.taskService;
+        this.objectMapper = controller.objectMapper;
     }
 
     @Override
@@ -55,20 +43,11 @@ public class TaskController extends HttpServlet {
                 handleGetTaskById(pathInfo, resp);
             }
         } catch (IOException e) {
-            e.printStackTrace();
+            LOGGER.error("Error processing GET request", e);
             resp.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
         }
     }
 
-    private void handleGetAllTasks(HttpServletResponse resp) {
-        try {
-            List<TaskDTO> tasks = taskService.getAllTasks();
-            writeResponse(resp, tasks);
-        } catch (IOException e) {
-            e.printStackTrace();
-            resp.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
-        }
-    }
     @Override
     protected void doPost(HttpServletRequest req, HttpServletResponse resp) {
         try {
@@ -81,19 +60,17 @@ public class TaskController extends HttpServlet {
             taskService.createTask(taskDTO);
             resp.setStatus(HttpServletResponse.SC_CREATED);
         } catch (IOException e) {
-
-            e.printStackTrace();
+            LOGGER.error("Error processing POST request", e);
             try {
                 resp.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "An error occurred while processing the request.");
             } catch (IOException ex) {
-
-                ex.printStackTrace();
+                LOGGER.error("Error sending error response", ex);
             }
         }
     }
 
     @Override
-    protected void doPut(HttpServletRequest req, HttpServletResponse resp) throws IOException, ServletException {
+    protected void doPut(HttpServletRequest req, HttpServletResponse resp) {
         try {
             TaskDTO taskDTO = objectMapper.readValue(req.getInputStream(), TaskDTO.class);
             if (taskDTO == null) {
@@ -106,12 +83,13 @@ public class TaskController extends HttpServlet {
             handleIOException(e, resp);
         }
     }
+
     @Override
     protected void doDelete(HttpServletRequest req, HttpServletResponse resp) {
         try {
             handleDeleteTask(req, resp);
         } catch (IOException e) {
-            e.printStackTrace();
+            LOGGER.error("Error processing DELETE request", e);
             resp.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
         }
     }
@@ -138,6 +116,16 @@ public class TaskController extends HttpServlet {
         }
     }
 
+    private void handleGetAllTasks(HttpServletResponse resp) {
+        try {
+            List<TaskDTO> tasks = taskService.getAllTasks();
+            writeResponse(resp, tasks);
+        } catch (IOException e) {
+            LOGGER.error("Error getting all tasks", e);
+            resp.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+        }
+    }
+
     void handleGetTaskById(String pathInfo, HttpServletResponse resp) throws IOException {
         String[] pathParts = pathInfo.split("/");
         if (pathParts.length > 1) {
@@ -152,7 +140,7 @@ public class TaskController extends HttpServlet {
             } catch (NumberFormatException e) {
                 resp.sendError(HttpServletResponse.SC_BAD_REQUEST, "Invalid task ID format");
             } catch (IOException e) {
-                e.printStackTrace();
+                LOGGER.error("Error getting task by ID", e);
                 resp.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
             }
         } else {
@@ -165,12 +153,12 @@ public class TaskController extends HttpServlet {
         objectMapper.writeValue(resp.getOutputStream(), data);
     }
 
-    private void handleIOException(IOException e, HttpServletResponse resp) {
-        e.printStackTrace();
+    void handleIOException(IOException e, HttpServletResponse resp) {
+        LOGGER.error("An internal error occurred", e);
         try {
             resp.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "An internal error occurred");
         } catch (IOException ex) {
-            ex.printStackTrace();
+            LOGGER.error("Error sending error response", ex);
         }
     }
 
