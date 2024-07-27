@@ -3,6 +3,9 @@ package dao;
 import dao.impl.TaskDAOImpl;
 import dao.impl.UserDAOImpl;
 import entity.User;
+import exception.DatabaseOperationException;
+import exception.TaskAssignmentException;
+import exception.UserNotFoundException;
 import org.junit.jupiter.api.*;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -36,7 +39,7 @@ public class UserDAOImplTest {
                 postgresContainer.getPassword())) {
 
             try (Statement statement = conn.createStatement()) {
-                
+
                 try {
                     statement.execute("DROP DATABASE IF EXISTS test_db");
                 } catch (SQLException e) {
@@ -336,6 +339,49 @@ public class UserDAOImplTest {
         });
 
         assertEquals("Database error", thrown.getCause().getMessage());
+    }
+
+    @Test
+    void testDeleteUserNotFoundCatch() throws SQLException {
+
+        Connection connection = mock(Connection.class);
+        PreparedStatement preparedStatement = mock(PreparedStatement.class);
+        when(connection.prepareStatement(anyString())).thenReturn(preparedStatement);
+        when(preparedStatement.executeUpdate()).thenReturn(0);        assertThrows(UserNotFoundException.class, () -> userDAO.delete(1L), "User not found with ID: 1");
+    }
+
+    @Test
+    void testDeleteDatabaseError() throws SQLException {
+        
+        Connection connection = mock(Connection.class);
+        PreparedStatement preparedStatement = mock(PreparedStatement.class);
+        when(connection.prepareStatement(anyString())).thenReturn(preparedStatement);
+        when(preparedStatement.executeUpdate()).thenThrow(new SQLException("Test SQLException"));        assertThrows(DatabaseOperationException.class, () -> userDAO.delete(1L), "Database error while deleting user");
+    }
+
+    @Test
+    void testAssignTaskToUserCheckSQLException() throws SQLException {
+
+        Connection connection = mock(Connection.class);
+        PreparedStatement checkStmt = mock(PreparedStatement.class);
+        when(connection.prepareStatement(contains("SELECT COUNT(*)"))).thenReturn(checkStmt);
+        when(checkStmt.executeQuery()).thenThrow(new SQLException("Test SQLException"));        assertThrows(TaskAssignmentException.class, () -> userDAO.assignTaskToUser(1L, 1L), "Error checking task assignment");
+    }
+
+    @Test
+    void testAssignTaskToUserInsertSQLException() throws SQLException {
+
+        Connection connection = mock(Connection.class);
+        PreparedStatement checkStmt = mock(PreparedStatement.class);
+        ResultSet resultSet = mock(ResultSet.class);
+        when(connection.prepareStatement(contains("SELECT COUNT(*)"))).thenReturn(checkStmt);
+        when(checkStmt.executeQuery()).thenReturn(resultSet);
+        when(resultSet.next()).thenReturn(true);
+        when(resultSet.getInt(1)).thenReturn(0);
+
+        PreparedStatement insertStmt = mock(PreparedStatement.class);
+        when(connection.prepareStatement(contains("INSERT INTO user_tasks"))).thenReturn(insertStmt);
+        doThrow(new SQLException("Test SQLException")).when(insertStmt).executeUpdate();        assertThrows(TaskAssignmentException.class, () -> userDAO.assignTaskToUser(1L, 1L), "Error assigning task to user");
     }
 
 }
