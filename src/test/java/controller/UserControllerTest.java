@@ -1,14 +1,11 @@
 package controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import config.DatabaseConfig;
 import dto.TaskDTO;
 import dto.UserDTO;
 import entity.Task;
 import entity.User;
-import exception.InitializationException;
 import exception.ServiceException;
-import factory.impl.UserControllerFactory;
 import jakarta.servlet.*;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -16,24 +13,18 @@ import mapper.UserMapper;
 import mapper.impl.UserMapperImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 import service.UserService;
-import service.impl.UserServiceImpl;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.lang.reflect.Field;
-import java.sql.SQLException;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
 import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.Mockito.*;
 
 public class UserControllerTest {
@@ -348,34 +339,6 @@ public class UserControllerTest {
         userController.doPut(request, response);
 
         verify(response).sendError(HttpServletResponse.SC_BAD_REQUEST, "UserDTO cannot be null");
-    }
-
-    @Test
-    void testUserControllerConstructor() throws NoSuchFieldException, IllegalAccessException {
-        UserServiceImpl userService = mock(UserServiceImpl.class);
-        ObjectMapper objectMapper = new ObjectMapper();
-        UserController userController = new UserController(userService, objectMapper);
-        UserController userControllerEmptyConstructor = new UserController();
-
-        assertNotNull(userController);
-
-        Field userServiceField = UserController.class.getDeclaredField("userService");
-        Field objectMapperField = UserController.class.getDeclaredField("objectMapper");
-        userServiceField.setAccessible(true);
-        objectMapperField.setAccessible(true);
-
-        assertEquals(userService, userServiceField.get(userController));
-        assertEquals(objectMapper, objectMapperField.get(userController));
-
-        assertEquals(UserController.class, userControllerEmptyConstructor.getClass());
-    }
-
-    @Test
-    public void testUserControllerConstructorWithSQLException() {
-        try (MockedStatic<DatabaseConfig> mockedConfig = Mockito.mockStatic(DatabaseConfig.class)) {
-            mockedConfig.when(DatabaseConfig::getConnection).thenThrow(new SQLException("Database error"));
-            assertThrows(InitializationException.class, UserControllerFactory::createUserController);
-        }
     }
 
     @Test

@@ -161,7 +161,6 @@ public class TaskDAOImpl implements TaskDAO {
         }
     }
 
-
     @Override
     public void delete(Long id) {
         String deleteUserTasksSQL = "DELETE FROM user_tasks WHERE task_id = ?";

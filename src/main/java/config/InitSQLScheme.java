@@ -1,14 +1,12 @@
 package config;
 
 import exception.DatabaseOperationException;
-import exception.SQLExceptionWrapper;
 
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.util.Objects;
 
 public class InitSQLScheme {
     private static final String SCHEME = "sql/schema.sql";
@@ -18,7 +16,8 @@ public class InitSQLScheme {
         loadInitSQL();
     }
 
-    private InitSQLScheme() {}
+    private InitSQLScheme() {
+    }
 
     public static void initSqlScheme() {
         try (Connection connection = DatabaseConfig.getConnection();
@@ -31,11 +30,9 @@ public class InitSQLScheme {
 
     private static void loadInitSQL() {
         try (InputStream inFile = InitSQLScheme.class.getClassLoader().getResourceAsStream(SCHEME)) {
-            schemeSql = new String(Objects.requireNonNull(inFile).readAllBytes(), StandardCharsets.UTF_8);
+            schemeSql = new String(inFile.readAllBytes(), StandardCharsets.UTF_8);
         } catch (Exception e) {
-            throw new SQLExceptionWrapper("SQL Exception", e);
+            throw new IllegalStateException();
         }
-
     }
-
 }

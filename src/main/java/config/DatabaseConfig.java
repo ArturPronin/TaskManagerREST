@@ -21,7 +21,8 @@ public class DatabaseConfig {
     private static final String USERNAME;
     private static final String PASSWORD;
 
-    private DatabaseConfig() {}
+    private DatabaseConfig() {
+    }
 
     static {
         ROOT_PATH = Objects.requireNonNull(Thread.currentThread().getContextClassLoader().getResource("")).getPath().replace("%20", " ");
