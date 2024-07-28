@@ -1,19 +1,24 @@
 package dto;
 
+import java.util.ArrayList;
+import java.util.List;
+
 public class TaskDTO {
     private Long id;
     private String title;
     private String description;
     private Long assignedUserId;
+    private List<TagDTO> tags = new ArrayList<>();
 
     public TaskDTO() {
     }
 
-    public TaskDTO(Long id, String title, String description, Long assignedUserId) {
+    public TaskDTO(Long id, String title, String description, Long assignedUserId, List<TagDTO> tags) {
         this.id = id;
         this.title = title;
         this.description = description;
         this.assignedUserId = assignedUserId;
+        this.tags = tags;
     }
 
     public Long getId() {
@@ -48,13 +53,22 @@ public class TaskDTO {
         this.assignedUserId = assignedUserId;
     }
 
+    public List<TagDTO> getTags() {
+        return tags;
+    }
+
+    public void setTags(List<TagDTO> tags) {
+        this.tags = tags;
+    }
+
     @Override
     public String toString() {
         return "TaskDTO{" +
                 "id=" + id +
-                ", name='" + title + '\'' +
+                ", title='" + title + '\'' +
                 ", description='" + description + '\'' +
                 ", assignedUserId=" + assignedUserId +
+                ", tags=" + tags +
                 '}';
     }
 }

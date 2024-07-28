@@ -1,9 +1,13 @@
 package service.impl;
 
 import dao.TaskDAO;
+import dto.TagDTO;
 import dto.TaskDTO;
+import entity.Tag;
 import entity.Task;
+import mapper.TagMapper;
 import mapper.TaskMapper;
+import mapper.impl.TagMapperImpl;
 import mapper.impl.TaskMapperImpl;
 import service.TaskService;
 
@@ -13,6 +17,8 @@ public class TaskServiceImpl implements TaskService {
 
     private final TaskDAO taskDAO;
     private final TaskMapper taskMapper = new TaskMapperImpl();
+
+    private final TagMapper tagMapper = new TagMapperImpl();
 
     public TaskServiceImpl(TaskDAO taskDAO) {
         this.taskDAO = taskDAO;
@@ -40,7 +46,15 @@ public class TaskServiceImpl implements TaskService {
     public List<TaskDTO> getAllTasks() {
         List<Task> tasks = taskDAO.findAll();
         return tasks.stream()
-                .map(taskMapper::toDTO)
+                .map(task -> {
+                    List<Tag> tags = taskDAO.getTagsByTaskId(task.getId());
+                    TaskDTO taskDTO = taskMapper.toDTO(task);
+
+                    taskDTO.setTags(tags.stream()
+                            .map(tagMapper::toDTO)
+                            .toList());
+                    return taskDTO;
+                })
                 .toList();
     }
 
@@ -58,5 +72,18 @@ public class TaskServiceImpl implements TaskService {
     @Override
     public void deleteTask(Long id) {
         taskDAO.delete(id);
+    }
+
+    @Override
+    public void assignTagsToTask(Long taskId, Long tagId) {
+        taskDAO.assignTagToTask(taskId, tagId);
+    }
+
+    @Override
+    public List<TagDTO> getTagsByTaskId(Long taskId) {
+        List<Tag> tags = taskDAO.getTagsByTaskId(taskId);
+        return tags.stream()
+                .map(tagMapper::toDTO)
+                .toList();
     }
 }

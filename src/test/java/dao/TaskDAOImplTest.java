@@ -6,6 +6,7 @@ import entity.Task;
 import entity.User;
 import exception.ConfigurationException;
 import exception.DatabaseOperationException;
+import exception.TaskAssignmentException;
 import factory.impl.TaskFactoryImpl;
 import org.junit.jupiter.api.*;
 import org.mockito.ArgumentMatchers;
@@ -102,15 +103,19 @@ public class TaskDAOImplTest {
             statement.execute("CREATE TABLE users (id BIGSERIAL PRIMARY KEY, name VARCHAR(255))");
             statement.execute("CREATE TABLE tasks (id BIGSERIAL PRIMARY KEY, title VARCHAR(255), description TEXT, assigned_user_id BIGINT)");
             statement.execute("CREATE TABLE user_tasks (user_id BIGINT REFERENCES users(id), task_id BIGINT REFERENCES tasks(id), PRIMARY KEY(user_id, task_id))");
+            statement.execute("CREATE TABLE tags (id BIGSERIAL PRIMARY KEY, name VARCHAR(255) NOT NULL)");
+            statement.execute("CREATE TABLE task_tag (task_id BIGINT REFERENCES tasks(id), tag_id BIGINT REFERENCES tags(id), PRIMARY KEY (task_id, tag_id))");
         }
     }
 
     @AfterEach
     public void tearDown() throws SQLException {
         try (Statement statement = connection.createStatement()) {
-            statement.execute("DROP TABLE IF EXISTS user_tasks");
-            statement.execute("DROP TABLE IF EXISTS tasks");
-            statement.execute("DROP TABLE IF EXISTS users");
+            statement.execute("DROP TABLE IF EXISTS user_tasks CASCADE");
+            statement.execute("DROP TABLE IF EXISTS tasks CASCADE");
+            statement.execute("DROP TABLE IF EXISTS users CASCADE");
+            statement.execute("DROP TABLE IF EXISTS tags CASCADE");
+            statement.execute("DROP TABLE IF EXISTS task_tag CASCADE");
         }
         if (connection != null && !connection.isClosed()) {
             connection.close();
@@ -481,5 +486,86 @@ public class TaskDAOImplTest {
         TaskDAOImpl.getAssignedUserIdQuery(taskDTO, existingTask, updateSql, parameters);
         assertFalse(updateSql.toString().contains("assigned_user_id = ?, "));
         assertTrue(parameters.isEmpty());
+    }
+
+    @Test
+    public void testAssignTagToTaskWhenTagAlreadyAssigned() throws SQLException {
+        Connection connection = mock(Connection.class);
+        PreparedStatement checkStmt = mock(PreparedStatement.class);
+        ResultSet rs = mock(ResultSet.class);
+
+        when(connection.prepareStatement(anyString())).thenReturn(checkStmt);
+        when(checkStmt.executeQuery()).thenReturn(rs);
+        when(rs.next()).thenReturn(true);
+        when(rs.getInt(1)).thenReturn(1);
+
+        TaskDAO taskDAO = new TaskDAOImpl(connection);
+
+        taskDAO.assignTagToTask(1L, 1L);
+
+        verify(checkStmt, times(1)).executeQuery();
+        verify(checkStmt, never()).executeUpdate();
+    }
+
+    @Test
+    public void testAssignTagToTaskWhenTagNotAssigned() throws SQLException {
+        Connection connection = mock(Connection.class);
+        PreparedStatement checkStmt = mock(PreparedStatement.class);
+        ResultSet rs = mock(ResultSet.class);
+        PreparedStatement insertStmt = mock(PreparedStatement.class);
+
+        when(connection.prepareStatement(anyString())).thenReturn(checkStmt).thenReturn(insertStmt);
+        when(checkStmt.executeQuery()).thenReturn(rs);
+        when(rs.next()).thenReturn(false);
+
+        TaskDAO taskDAO = new TaskDAOImpl(connection);
+
+        taskDAO.assignTagToTask(1L, 1L);
+
+        verify(checkStmt).executeQuery();
+        verify(insertStmt).executeUpdate();
+    }
+
+    @Test
+    public void testAssignTagToTaskSQLException() throws SQLException {
+        Connection connection = mock(Connection.class);
+        PreparedStatement checkStmt = mock(PreparedStatement.class);
+        when(connection.prepareStatement(anyString())).thenReturn(checkStmt);
+        doThrow(new SQLException("Database error")).when(checkStmt).executeQuery();
+
+        TaskDAO taskDAO = new TaskDAOImpl(connection);
+
+        RuntimeException thrown = assertThrows(RuntimeException.class, () -> {
+            taskDAO.assignTagToTask(1L, 1L);
+        });
+
+        assertEquals("Database error", thrown.getCause().getMessage());
+    }
+
+    @Test
+    void testAssignTagToTaskCheckSQLException() throws SQLException {
+
+        Connection connection = mock(Connection.class);
+        PreparedStatement checkStmt = mock(PreparedStatement.class);
+        when(connection.prepareStatement(contains("SELECT COUNT(*)"))).thenReturn(checkStmt);
+        when(checkStmt.executeQuery()).thenThrow(new SQLException("Test SQLException"));
+        assertThrows(TaskAssignmentException.class, () -> taskDAO.assignTagToTask(1L, 1L), "Error checking tag assignment");
+    }
+
+    @Test
+    void testAssignTaskToTagInsertSQLException() throws SQLException {
+
+        Connection connection = mock(Connection.class);
+        PreparedStatement checkStmt = mock(PreparedStatement.class);
+        ResultSet resultSet = mock(ResultSet.class);
+        when(connection.prepareStatement(contains("SELECT COUNT(*)"))).thenReturn(checkStmt);
+        when(checkStmt.executeQuery()).thenReturn(resultSet);
+        when(resultSet.next()).thenReturn(true);
+        when(resultSet.getInt(1)).thenReturn(0);
+
+        PreparedStatement insertStmt = mock(PreparedStatement.class);
+        when(connection.prepareStatement(contains("INSERT INTO user_tasks"))).thenReturn(insertStmt);
+        doThrow(new SQLException("Test SQLException")).when(insertStmt).executeUpdate();
+        assertThrows(TaskAssignmentException.class, () -> taskDAO.assignTagToTask(1L, 1L), "Error assigning tag to task");
     }
 }

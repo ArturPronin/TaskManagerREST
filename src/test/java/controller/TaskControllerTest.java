@@ -1,7 +1,9 @@
 package controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import dto.TagDTO;
 import dto.TaskDTO;
+import entity.Tag;
 import entity.Task;
 import exception.ServiceException;
 import jakarta.servlet.*;
@@ -18,6 +20,7 @@ import service.TaskService;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
@@ -46,8 +49,8 @@ public class TaskControllerTest {
         HttpServletRequest request = mock(HttpServletRequest.class);
         HttpServletResponse response = mock(HttpServletResponse.class);
 
-        List<TaskDTO> tasks = Arrays.asList(new TaskDTO(1L, "Task1", "Description1", 1L),
-                new TaskDTO(2L, "Task2", "Description2", 2L));
+        List<TaskDTO> tasks = Arrays.asList(new TaskDTO(1L, "Task1", "Description1", 1L, null),
+                new TaskDTO(2L, "Task2", "Description2", 2L, null));
         when(taskService.getAllTasks()).thenReturn(tasks);
 
         ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
@@ -80,7 +83,7 @@ public class TaskControllerTest {
     public void testDoGetTaskById() throws Exception {
         HttpServletRequest request = mock(HttpServletRequest.class);
         HttpServletResponse response = mock(HttpServletResponse.class);
-        TaskDTO task = new TaskDTO(1L, "Task1", "Description1", 1L);
+        TaskDTO task = new TaskDTO(1L, "Task1", "Description1", 1L, null);
 
         when(request.getPathInfo()).thenReturn("/1");
         when(taskService.getTaskById(1L)).thenReturn(task);
@@ -115,9 +118,12 @@ public class TaskControllerTest {
     public void testDoPostCreateTask() throws Exception {
         HttpServletRequest request = mock(HttpServletRequest.class);
         HttpServletResponse response = mock(HttpServletResponse.class);
+        List<TagDTO> tagsDTO = new ArrayList<>();
+
         TaskDTO taskDTO = new TaskDTO();
         taskDTO.setId(1L);
         taskDTO.setTitle("TaskTitle");
+        taskDTO.setTags(tagsDTO);
         String json = new ObjectMapper().writeValueAsString(taskDTO);
         ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(json.getBytes());
 
@@ -143,10 +149,14 @@ public class TaskControllerTest {
             }
         };
 
-        doReturn(servletInputStream).when(request).getInputStream();
+        when(request.getPathInfo()).thenReturn("/");
+        when(request.getInputStream()).thenReturn(servletInputStream);
+        doNothing().when(taskService).createTask(any(TaskDTO.class));
+        doNothing().when(response).setStatus(HttpServletResponse.SC_CREATED);
 
         taskController.doPost(request, response);
 
+        verify(request).getInputStream();
         verify(taskService).createTask(any(TaskDTO.class));
         verify(response).setStatus(HttpServletResponse.SC_CREATED);
     }
@@ -226,24 +236,7 @@ public class TaskControllerTest {
 
         taskController.doGet(request, response);
 
-        verify(response).sendError(HttpServletResponse.SC_BAD_REQUEST, "Invalid task ID format");
-    }
-
-    @Test
-    void testDoGetInvalidPathLength() throws ServletException, IOException {
-        HttpServletRequest request = mock(HttpServletRequest.class);
-        HttpServletResponse response = mock(HttpServletResponse.class);
-        when(request.getPathInfo()).thenReturn("");
-
-        taskController.doGet(request, response);
-
-        verify(response).sendError(HttpServletResponse.SC_BAD_REQUEST);
-
-        String[] pathParts = when(request.getPathInfo()).thenReturn("").toString().split("/");
-
-        if (pathParts.length < 1) {
-            verify(response).sendError(HttpServletResponse.SC_BAD_REQUEST);
-        }
+        verify(response).sendError(HttpServletResponse.SC_BAD_REQUEST, "Invalid path get");
     }
 
     @Test
@@ -279,7 +272,10 @@ public class TaskControllerTest {
             }
         };
 
+        when(request.getPathInfo()).thenReturn("/");
         when(request.getInputStream()).thenReturn(servletInputStream);
+        doNothing().when(taskService).createTask(any(TaskDTO.class));
+        doNothing().when(response).setStatus(HttpServletResponse.SC_CREATED);
 
         taskController.doPost(request, response);
 
@@ -373,19 +369,24 @@ public class TaskControllerTest {
         String title = "Test Task";
         String description = "This is a test task";
         Long assignedUserId = 123L;
+        List<Tag> tags = new ArrayList<>();
+        Tag tag = new Tag(1L, "Tag1", null);
+        tags.add(tag);
 
-        Task task = new Task(id, title, description, assignedUserId);
+        Task task = new Task(id, title, description, assignedUserId, tags);
 
         assertEquals(id, task.getId());
         assertEquals(title, task.getTitle());
         assertEquals(description, task.getDescription());
         assertEquals(assignedUserId, task.getAssignedUserId());
+        assertEquals(tags, task.getTags());
 
         String expectedToString = "Task{" +
                 "id=" + id +
-                ", name='" + title + '\'' +
+                ", title='" + title + '\'' +
                 ", description='" + description + '\'' +
                 ", assignedUserId=" + assignedUserId +
+                ", tags=" + tags +
                 '}';
 
         assertEquals(expectedToString, task.toString());
@@ -397,19 +398,26 @@ public class TaskControllerTest {
         String title = "Test Task";
         String description = "This is a test task";
         Long assignedUserId = 123L;
+        List<TagDTO> tagsDTO = new ArrayList<>();
+        TagDTO tagDTO = new TagDTO(1L, "Tag1", null);
+        TagDTO tagDTO2 = new TagDTO(2L, "Tag2", null);
+        tagsDTO.add(tagDTO);
+        tagsDTO.add(tagDTO2);
 
-        TaskDTO taskDTO = new TaskDTO(id, title, description, assignedUserId);
+        TaskDTO taskDTO = new TaskDTO(id, title, description, assignedUserId, tagsDTO);
 
         assertEquals(id, taskDTO.getId());
         assertEquals(title, taskDTO.getTitle());
         assertEquals(description, taskDTO.getDescription());
         assertEquals(assignedUserId, taskDTO.getAssignedUserId());
+        assertEquals(tagsDTO, taskDTO.getTags());
 
         String expectedToString = "TaskDTO{" +
                 "id=" + id +
-                ", name='" + title + '\'' +
+                ", title='" + title + '\'' +
                 ", description='" + description + '\'' +
                 ", assignedUserId=" + assignedUserId +
+                ", tags=" + tagsDTO +
                 '}';
 
         assertEquals(expectedToString, taskDTO.toString());
@@ -422,13 +430,13 @@ public class TaskControllerTest {
         Task task = null;
         assertNull(taskMapper.toDTO(task));
 
-        Task task2 = new Task(2L, "", "", null);
+        Task task2 = new Task(2L, "", "", null, null);
         assertNull(taskMapper.toDTO(task2));
 
         TaskDTO taskDTO = null;
         assertNull(taskMapper.toEntity(taskDTO));
 
-        TaskDTO taskDTO2 = new TaskDTO(2L, "", "", null);
+        TaskDTO taskDTO2 = new TaskDTO(2L, "", "", null, null);
         assertNull(taskMapper.toEntity(taskDTO2));
     }
 
@@ -524,13 +532,26 @@ public class TaskControllerTest {
 
     @Test
     void testDoPostIOException() throws IOException {
-        HttpServletRequest req = mock(HttpServletRequest.class);
-        HttpServletResponse resp = mock(HttpServletResponse.class);
+        HttpServletRequest request = mock(HttpServletRequest.class);
+        HttpServletResponse response = mock(HttpServletResponse.class);
 
-        when(req.getInputStream()).thenThrow(new IOException("Test IOException"));
+        when(request.getPathInfo()).thenReturn("/invalid/path");
 
-        taskController.doPost(req, resp);
+        taskController.doPost(request, response);
 
-        verify(resp).sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "An error occurred while processing the request.");
+        verify(response).sendError(HttpServletResponse.SC_BAD_REQUEST, "Invalid Path");
+    }
+
+    @Test
+    public void testDoPostAssignTagsToTask() throws Exception {
+        HttpServletRequest request = mock(HttpServletRequest.class);
+        HttpServletResponse response = mock(HttpServletResponse.class);
+
+        when(request.getPathInfo()).thenReturn("/1/tags/2");
+
+        taskController.doPost(request, response);
+
+        verify(taskService).assignTagsToTask(1L, 2L);
+        verify(response).setStatus(HttpServletResponse.SC_NO_CONTENT);
     }
 }

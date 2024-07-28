@@ -1,13 +1,15 @@
 DROP TABLE IF EXISTS users CASCADE;
 DROP TABLE IF EXISTS tasks CASCADE;
 DROP TABLE IF EXISTS user_tasks CASCADE;
+DROP TABLE IF EXISTS tags CASCADE;
+DROP TABLE IF EXISTS task_tag CASCADE;
 
 
 CREATE TABLE IF NOT EXISTS users
 (
     id BIGSERIAL PRIMARY KEY,
     name VARCHAR(255) NOT NULL
-    );
+);
 
 CREATE TABLE IF NOT EXISTS tasks
 (
@@ -15,14 +17,25 @@ CREATE TABLE IF NOT EXISTS tasks
     title VARCHAR(255) NOT NULL,
     description TEXT,
     assigned_user_id BIGINT
-    );
+);
 
 CREATE TABLE IF NOT EXISTS user_tasks
 (
     user_id BIGINT REFERENCES users(id),
     task_id BIGINT REFERENCES tasks(id),
     PRIMARY KEY(user_id, task_id)
-    );
+);
+
+CREATE TABLE tags (
+    id BIGSERIAL PRIMARY KEY,
+    name VARCHAR(255) NOT NULL
+);
+
+CREATE TABLE task_tag (
+     task_id BIGINT REFERENCES tasks(id),
+     tag_id BIGINT REFERENCES tags(id),
+     PRIMARY KEY (task_id, tag_id)
+);
 
 INSERT INTO users (name)
 VALUES ('User1'),
@@ -46,6 +59,24 @@ VALUES (1, 1),
        (4, 4),
        (5, 5),
        (1, 6);
+
+INSERT INTO tags (name)
+VALUES ('Tag1'),
+       ('Tag2'),
+       ('Tag3'),
+       ('Tag4'),
+       ('Tag5'),
+       ('Tag6');
+
+INSERT INTO task_tag (task_id, tag_id)
+VALUES (1, 1),
+       (1, 2),
+       (1, 3),
+       (2, 4),
+       (3, 4),
+       (4, 4),
+       (5, 4);
+
 
 
 
