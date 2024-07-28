@@ -4,6 +4,7 @@ import dao.impl.TaskDAOImpl;
 import dao.impl.UserDAOImpl;
 import entity.Task;
 import entity.User;
+import exception.ConfigurationException;
 import exception.DatabaseOperationException;
 import factory.impl.TaskFactoryImpl;
 import org.junit.jupiter.api.*;
@@ -11,9 +12,13 @@ import org.mockito.ArgumentMatchers;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
+import java.io.FileInputStream;
+import java.io.IOException;
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
+import java.util.Properties;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -26,16 +31,37 @@ public class TaskDAOImplTest {
     private TaskDAO taskDAO;
     private static Connection connection;
     private UserDAO userDAO;
+    private static String rootPath;
+    private static String dbConfigPath;
+    private static Properties properties;
+    private static String username;
+    private static String password;
+    private static String container;
 
     @BeforeAll
     public static void setUpBeforeClass() {
-        postgresContainer = new PostgreSQLContainer<>("postgres:16").withUsername("test_user").withPassword("test_password");
+        properties = new Properties();
+        rootPath = Objects.requireNonNull(Thread.currentThread().getContextClassLoader().getResource("")).getPath().replace("%20", " ");
+        dbConfigPath = rootPath + "database.properties";
+        try {
+            properties.load(new FileInputStream(dbConfigPath));
+        } catch (IOException e) {
+            throw new ConfigurationException("Failed to load database configuration", e);
+        }
+
+        username = properties.getProperty("database.username");
+        password = properties.getProperty("database.password");
+        container = properties.getProperty("container.name");
+
+        postgresContainer = new PostgreSQLContainer<>(container)
+                .withUsername(username)
+                .withPassword(password);
         postgresContainer.start();
 
         try (Connection conn = DriverManager.getConnection(postgresContainer.getJdbcUrl(), postgresContainer.getUsername(), postgresContainer.getPassword())) {
 
             try (Statement statement = conn.createStatement()) {
-                
+
                 try {
                     statement.execute("DROP DATABASE IF EXISTS test_db");
                 } catch (SQLException e) {

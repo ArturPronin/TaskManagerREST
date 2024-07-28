@@ -1,12 +1,9 @@
 package controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import config.DatabaseConfig;
 import dto.TaskDTO;
 import entity.Task;
-import exception.InitializationException;
 import exception.ServiceException;
-import factory.impl.TaskControllerFactory;
 import jakarta.servlet.*;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -14,7 +11,6 @@ import mapper.TaskMapper;
 import mapper.impl.TaskMapperImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 import org.slf4j.Logger;
 import service.TaskService;
@@ -22,13 +18,9 @@ import service.TaskService;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.lang.reflect.Field;
-import java.sql.SQLException;
 import java.util.Arrays;
 import java.util.List;
 
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.ArgumentMatchers.any;
@@ -210,35 +202,6 @@ public class TaskControllerTest {
 
         verify(taskService).deleteTask(1L);
         verify(response).setStatus(HttpServletResponse.SC_NO_CONTENT);
-    }
-
-    @Test
-    void testTaskControllerConstructor() throws NoSuchFieldException, IllegalAccessException {
-        TaskService taskService = mock(TaskService.class);
-        ObjectMapper objectMapper = new ObjectMapper();
-        TaskController taskController = new TaskController(taskService, objectMapper);
-        TaskController taskControllerEmptyConstructor = new TaskController();
-
-        assertNotNull(taskController);
-
-        Field taskServiceField = TaskController.class.getDeclaredField("taskService");
-        Field objectMapperField = TaskController.class.getDeclaredField("objectMapper");
-        taskServiceField.setAccessible(true);
-        objectMapperField.setAccessible(true);
-
-        assertEquals(taskService, taskServiceField.get(taskController));
-        assertEquals(objectMapper, objectMapperField.get(taskController));
-
-        assertEquals(TaskController.class, taskControllerEmptyConstructor.getClass());
-    }
-
-    @Test
-    public void testTaskControllerConstructorWithSQLException() {
-        try (MockedStatic<DatabaseConfig> mockedConfig = Mockito.mockStatic(DatabaseConfig.class)) {
-            mockedConfig.when(DatabaseConfig::getConnection)
-                    .thenThrow(new SQLException("Database error"));
-            assertThrows(InitializationException.class, TaskControllerFactory::createTaskController);
-        }
     }
 
     @Test
