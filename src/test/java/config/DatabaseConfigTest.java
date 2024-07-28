@@ -1,7 +1,9 @@
 package config;
 
+import controller.TagController;
 import controller.TaskController;
 import controller.UserController;
+import factory.impl.TagControllerFactory;
 import factory.impl.TaskControllerFactory;
 import factory.impl.UserControllerFactory;
 import org.junit.jupiter.api.*;
@@ -95,9 +97,11 @@ public class DatabaseConfigTest {
                 postgresContainer.getUsername(),
                 postgresContainer.getPassword())) {
             try (Statement statement = conn.createStatement()) {
-                statement.execute("CREATE TABLE IF NOT EXISTS users (id SERIAL PRIMARY KEY, name VARCHAR(255))");
-                statement.execute("CREATE TABLE IF NOT EXISTS tasks (id SERIAL PRIMARY KEY, description TEXT)");
-                statement.execute("CREATE TABLE IF NOT EXISTS user_tasks (user_id INT, task_id INT)");
+                statement.execute("CREATE TABLE users (id BIGSERIAL PRIMARY KEY, name VARCHAR(255))");
+                statement.execute("CREATE TABLE tasks (id BIGSERIAL PRIMARY KEY, title VARCHAR(255), description TEXT, assigned_user_id BIGINT)");
+                statement.execute("CREATE TABLE user_tasks (user_id BIGINT REFERENCES users(id), task_id BIGINT REFERENCES tasks(id), PRIMARY KEY(user_id, task_id))");
+                statement.execute("CREATE TABLE tags (id BIGSERIAL PRIMARY KEY, name VARCHAR(255) NOT NULL)");
+                statement.execute("CREATE TABLE task_tag (task_id BIGINT REFERENCES tasks(id), tag_id BIGINT REFERENCES tags(id), PRIMARY KEY (task_id, tag_id))");
             }
         }
     }
@@ -109,9 +113,11 @@ public class DatabaseConfigTest {
                 postgresContainer.getUsername(),
                 postgresContainer.getPassword())) {
             try (Statement statement = conn.createStatement()) {
-                statement.execute("DROP TABLE IF EXISTS user_tasks");
-                statement.execute("DROP TABLE IF EXISTS tasks");
-                statement.execute("DROP TABLE IF EXISTS users");
+                statement.execute("DROP TABLE IF EXISTS user_tasks CASCADE");
+                statement.execute("DROP TABLE IF EXISTS tasks CASCADE");
+                statement.execute("DROP TABLE IF EXISTS users CASCADE");
+                statement.execute("DROP TABLE IF EXISTS tags CASCADE");
+                statement.execute("DROP TABLE IF EXISTS task_tag CASCADE");
             }
         }
     }
@@ -128,6 +134,12 @@ public class DatabaseConfigTest {
     public void testCreateUserController() {
         UserController userController = UserControllerFactory.createUserController();
         assertNotNull(userController, "UserController should not be null");
+    }
+
+    @Test
+    public void testCreateTagController() {
+        TagController tagController = TagControllerFactory.createTagController();
+        assertNotNull(tagController, "TagController should not be null");
     }
 
     @Test
@@ -153,5 +165,23 @@ public class DatabaseConfigTest {
 
             connection.close();
         }
+    }
+
+    @Test
+    public void testCreateTaskControllerNotParameters() {
+        TaskController taskController = new TaskController();
+        assertNotNull(taskController, "TaskController should not be null");
+    }
+
+    @Test
+    public void testCreateUserControllerNotParameters() {
+        UserController userController = new UserController();
+        assertNotNull(userController, "UserController should not be null");
+    }
+
+    @Test
+    public void testCreateTagControllerNotParameters() {
+        TagController tagController = new TagController();
+        assertNotNull(tagController, "TagController should not be null");
     }
 }

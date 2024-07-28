@@ -1,19 +1,25 @@
 package entity;
 
+import java.util.ArrayList;
+import java.util.List;
+
 public class Task {
     private java.lang.Long id;
     private String title;
     private String description;
     private Long assignedUserId;
 
+    private List<Tag> tags = new ArrayList<>();
+
     public Task() {
     }
 
-    public Task(Long id, String title, String description, Long assignedUserId) {
+    public Task(Long id, String title, String description, Long assignedUserId, List<Tag> tags) {
         this.id = id;
         this.title = title;
         this.description = description;
         this.assignedUserId = assignedUserId;
+        this.tags = tags;
     }
 
     public Long getId() {
@@ -48,13 +54,22 @@ public class Task {
         this.assignedUserId = assignedUserId;
     }
 
+    public List<Tag> getTags() {
+        return tags;
+    }
+
+    public void setTags(List<Tag> tags) {
+        this.tags = tags;
+    }
+
     @Override
     public String toString() {
         return "Task{" +
                 "id=" + id +
-                ", name='" + title + '\'' +
+                ", title='" + title + '\'' +
                 ", description='" + description + '\'' +
                 ", assignedUserId=" + assignedUserId +
+                ", tags=" + tags +
                 '}';
     }
 }

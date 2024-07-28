@@ -1,20 +1,20 @@
 package controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import dto.TagDTO;
 import dto.TaskDTO;
-import dto.UserDTO;
+import entity.Tag;
 import entity.Task;
-import entity.User;
 import exception.ServiceException;
 import jakarta.servlet.*;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import mapper.UserMapper;
-import mapper.impl.UserMapperImpl;
+import mapper.TagMapper;
+import mapper.impl.TagMapperImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
-import service.UserService;
+import service.TagService;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -25,30 +25,31 @@ import java.util.List;
 
 import static org.junit.Assert.assertNull;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.*;
 
-public class UserControllerTest {
-
-    private UserService userService;
+public class TagsControllerTest {
+    private TagService tagService;
     private ObjectMapper objectMapper;
-    private UserController userController;
+    private TagController tagController;
     private HttpServletResponse resp;
 
     @BeforeEach
     public void setUp() {
-        userService = Mockito.mock(UserService.class);
+        tagService = Mockito.mock(TagService.class);
         objectMapper = new ObjectMapper();
-        userController = new UserController(userService, objectMapper);
+        tagController = new TagController(tagService, objectMapper);
         resp = Mockito.mock(HttpServletResponse.class);
     }
 
     @Test
-    public void testDoGetAllUsers() throws Exception {
+    public void testDoGetAllTags() throws Exception {
         HttpServletRequest request = mock(HttpServletRequest.class);
         HttpServletResponse response = mock(HttpServletResponse.class);
 
-        List<UserDTO> users = Arrays.asList(new UserDTO(1L, "User1", null), new UserDTO(2L, "User2", null));
-        when(userService.getAllUsers()).thenReturn(users);
+        List<TagDTO> tags = Arrays.asList(new TagDTO(1L, "Tag1", null), new TagDTO(2L, "Tag2", null));
+        when(tagService.getAllTags()).thenReturn(tags);
 
         ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
         ServletOutputStream servletOutputStream = new ServletOutputStream() {
@@ -69,22 +70,22 @@ public class UserControllerTest {
         };
         when(response.getOutputStream()).thenReturn(servletOutputStream);
 
-        userController.doGet(request, response);
+        tagController.doGet(request, response);
 
         String jsonResponse = outputStream.toString();
-        String expectedJson = objectMapper.writeValueAsString(users);
+        String expectedJson = objectMapper.writeValueAsString(tags);
         assertEquals(expectedJson, jsonResponse);
     }
 
     @Test
-    public void testDoGetUserById() throws Exception {
+    public void testDoGetTagById() throws Exception {
         HttpServletRequest request = mock(HttpServletRequest.class);
         HttpServletResponse response = mock(HttpServletResponse.class);
-        UserDTO user = new UserDTO(1L, "User1", Collections.emptyList());
+        TagDTO tag = new TagDTO(1L, "Tag1", Collections.emptyList());
 
         when(request.getPathInfo()).thenReturn("/1");
-        when(userService.getUserById(1L)).thenReturn(user);
-        when(userService.getTasksByUserId(1L)).thenReturn(Collections.emptyList());
+        when(tagService.getTagById(1L)).thenReturn(tag);
+        when(tagService.getTasksByTagId(1L)).thenReturn(Collections.emptyList());
 
         ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
         ServletOutputStream servletOutputStream = new ServletOutputStream() {
@@ -105,34 +106,34 @@ public class UserControllerTest {
         };
         when(response.getOutputStream()).thenReturn(servletOutputStream);
 
-        userController.doGet(request, response);
+        tagController.doGet(request, response);
 
         String jsonResponse = outputStream.toString();
-        String expectedJson = objectMapper.writeValueAsString(user);
+        String expectedJson = objectMapper.writeValueAsString(tag);
         assertEquals(expectedJson, jsonResponse);
     }
 
     @Test
-    public void testDoPostAssignTaskToUser() throws Exception {
+    public void testDoPostAssignTaskToTag() throws Exception {
         HttpServletRequest request = mock(HttpServletRequest.class);
         HttpServletResponse response = mock(HttpServletResponse.class);
 
         when(request.getPathInfo()).thenReturn("/1/tasks/2");
 
-        userController.doPost(request, response);
+        tagController.doPost(request, response);
 
-        verify(userService).assignTaskToUser(1L, 2L);
+        verify(tagService).assignTaskToTag(1L, 2L);
         verify(response).setStatus(HttpServletResponse.SC_NO_CONTENT);
     }
 
     @Test
-    void testDoPostCreateUser() throws Exception {
+    void testDoPostCreateTag() throws Exception {
         HttpServletRequest request = mock(HttpServletRequest.class);
         HttpServletResponse response = mock(HttpServletResponse.class);
-        UserDTO userDTO = new UserDTO();
-        userDTO.setId(1L);
-        userDTO.setName("SetUsername");
-        String json = new ObjectMapper().writeValueAsString(userDTO);
+        TagDTO tagDTO = new TagDTO();
+        tagDTO.setId(1L);
+        tagDTO.setName("SetTagName");
+        String json = new ObjectMapper().writeValueAsString(tagDTO);
         ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(json.getBytes());
 
         ServletInputStream servletInputStream = new ServletInputStream() {
@@ -159,25 +160,24 @@ public class UserControllerTest {
 
         when(request.getPathInfo()).thenReturn("/");
         when(request.getInputStream()).thenReturn(servletInputStream);
-        doNothing().when(userService).createUser(any(UserDTO.class));
+        doNothing().when(tagService).createTag(any(TagDTO.class));
         doNothing().when(response).setStatus(HttpServletResponse.SC_CREATED);
 
-        userController.doPost(request, response);
+        tagController.doPost(request, response);
 
         verify(request).getInputStream();
-        verify(userService).createUser(any(UserDTO.class));
+        verify(tagService).createTag(any(TagDTO.class));
         verify(response).setStatus(HttpServletResponse.SC_CREATED);
     }
 
     @Test
-    void testDoPutUpdateUser() throws Exception {
+    void testDoPutUpdateTag() throws Exception {
         HttpServletRequest request = mock(HttpServletRequest.class);
         HttpServletResponse response = mock(HttpServletResponse.class);
-
-        UserDTO userDTO = new UserDTO();
-        userDTO.setId(1L);
-        userDTO.setName("SetUsername");
-        String json = new ObjectMapper().writeValueAsString(userDTO);
+        TagDTO tagDTO = new TagDTO();
+        tagDTO.setId(1L);
+        tagDTO.setName("SetTagName");
+        String json = new ObjectMapper().writeValueAsString(tagDTO);
         ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(json.getBytes());
 
         ServletInputStream servletInputStream = new ServletInputStream() {
@@ -203,28 +203,28 @@ public class UserControllerTest {
         };
 
         doReturn(servletInputStream).when(request).getInputStream();
-        when(userService.getUserById(1L)).thenReturn(userDTO);
-        doNothing().when(userService).updateUser(any(UserDTO.class));
+        when(tagService.getTagById(1L)).thenReturn(tagDTO);
+        doNothing().when(tagService).updateTag(any(TagDTO.class));
         doNothing().when(response).setStatus(HttpServletResponse.SC_NO_CONTENT);
 
-        userController.doPut(request, response);
+        tagController.doPut(request, response);
 
         verify(request).getInputStream();
-        verify(userService).getUserById(1L);
-        verify(userService).updateUser(any(UserDTO.class));
+        verify(tagService).getTagById(1L);
+        verify(tagService).updateTag(any(TagDTO.class));
         verify(response).setStatus(HttpServletResponse.SC_NO_CONTENT);
     }
 
     @Test
-    public void testDoDeleteUser() throws Exception {
+    public void testDoDeleteTag() throws Exception {
         HttpServletRequest request = mock(HttpServletRequest.class);
         HttpServletResponse response = mock(HttpServletResponse.class);
 
         when(request.getPathInfo()).thenReturn("/1");
 
-        userController.doDelete(request, response);
+        tagController.doDelete(request, response);
 
-        verify(userService).deleteUser(1L);
+        verify(tagService).deleteTag(1L);
         verify(response).setStatus(HttpServletResponse.SC_NO_CONTENT);
     }
 
@@ -235,7 +235,7 @@ public class UserControllerTest {
 
         when(request.getPathInfo()).thenReturn("/invalid/path");
 
-        userController.doGet(request, response);
+        tagController.doGet(request, response);
 
         verify(response).sendError(HttpServletResponse.SC_BAD_REQUEST, "Invalid path");
     }
@@ -247,7 +247,7 @@ public class UserControllerTest {
 
         when(request.getPathInfo()).thenReturn("/invalid/path");
 
-        userController.doPost(request, response);
+        tagController.doPost(request, response);
 
         verify(response).sendError(HttpServletResponse.SC_BAD_REQUEST, "Invalid Path");
     }
@@ -259,17 +259,17 @@ public class UserControllerTest {
 
         when(request.getPathInfo()).thenReturn("");
 
-        userController.doDelete(request, response);
+        tagController.doDelete(request, response);
 
         verify(response).sendError(HttpServletResponse.SC_BAD_REQUEST, "Invalid path length");
     }
 
     @Test
-    void testDoPostUserDTONull() throws Exception {
+    void testDoPostTagDTONull() throws Exception {
         HttpServletRequest request = mock(HttpServletRequest.class);
         HttpServletResponse response = mock(HttpServletResponse.class);
-        UserDTO userDTO = null;
-        String json = new ObjectMapper().writeValueAsString(userDTO);
+        TagDTO tagDTO = null;
+        String json = new ObjectMapper().writeValueAsString(tagDTO);
         ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(json.getBytes());
         when(request.getPathInfo()).thenReturn("/");
 
@@ -297,18 +297,18 @@ public class UserControllerTest {
 
         when(request.getInputStream()).thenReturn(servletInputStream);
 
-        userController.doPost(request, response);
+        tagController.doPost(request, response);
 
-        verify(response).sendError(HttpServletResponse.SC_BAD_REQUEST, "UserDTO cannot be null");
+        verify(response).sendError(HttpServletResponse.SC_BAD_REQUEST, "TagDTO cannot be null");
 
     }
 
     @Test
-    void testDoPutUserDTONull() throws ServletException, IOException {
+    void testDoPutTagDTONull() throws ServletException, IOException {
         HttpServletRequest request = mock(HttpServletRequest.class);
         HttpServletResponse response = mock(HttpServletResponse.class);
-        UserDTO userDTO = null;
-        String json = new ObjectMapper().writeValueAsString(userDTO);
+        TagDTO tagDTO = null;
+        String json = new ObjectMapper().writeValueAsString(tagDTO);
         ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(json.getBytes());
         when(request.getPathInfo()).thenReturn("/");
 
@@ -336,9 +336,9 @@ public class UserControllerTest {
 
         when(request.getInputStream()).thenReturn(servletInputStream);
 
-        userController.doPut(request, response);
+        tagController.doPut(request, response);
 
-        verify(response).sendError(HttpServletResponse.SC_BAD_REQUEST, "UserDTO cannot be null");
+        verify(response).sendError(HttpServletResponse.SC_BAD_REQUEST, "TagDTO cannot be null");
     }
 
     @Test
@@ -372,9 +372,9 @@ public class UserControllerTest {
         };
         when(request.getInputStream()).thenReturn(servletInputStream);
 
-        userController.doPost(request, response);
+        tagController.doPost(request, response);
 
-        verify(response).sendError(HttpServletResponse.SC_BAD_REQUEST, "Invalid UserDTO");
+        verify(response).sendError(HttpServletResponse.SC_BAD_REQUEST, "Invalid TagDTO");
     }
 
     @Test
@@ -385,21 +385,21 @@ public class UserControllerTest {
 
         when(request.getPathInfo()).thenReturn("/1/tasks/");
 
-        userController.doPost(request, response);
+        tagController.doPost(request, response);
 
         verify(response).sendError(HttpServletResponse.SC_BAD_REQUEST, "Invalid Path");
     }
 
     @Test
-    public void testDoPutInvalidUserDTO() throws Exception {
+    public void testDoPutInvalidTagDTO() throws Exception {
         HttpServletRequest request = mock(HttpServletRequest.class);
         HttpServletResponse response = mock(HttpServletResponse.class);
 
         when(request.getInputStream()).thenThrow(new IOException("Invalid Input"));
 
-        userController.doPut(request, response);
+        tagController.doPut(request, response);
 
-        verify(response).sendError(HttpServletResponse.SC_BAD_REQUEST, "Invalid UserDTO");
+        verify(response).sendError(HttpServletResponse.SC_BAD_REQUEST, "Invalid TagDTO");
     }
 
     @Test
@@ -409,33 +409,33 @@ public class UserControllerTest {
 
         when(request.getPathInfo()).thenReturn("/");
 
-        userController.doDelete(request, response);
+        tagController.doDelete(request, response);
 
         verify(response).sendError(HttpServletResponse.SC_BAD_REQUEST, "Path cannot be null or empty");
     }
 
     @Test
-    public void testDoGetUserNotFound() throws Exception {
+    public void testDoGetTagNotFound() throws Exception {
         HttpServletRequest request = mock(HttpServletRequest.class);
         HttpServletResponse response = mock(HttpServletResponse.class);
 
         when(request.getPathInfo()).thenReturn("/999");
-        when(userService.getUserById(999L)).thenReturn(null);
+        when(tagService.getTagById(999L)).thenReturn(null);
 
-        userController.doGet(request, response);
+        tagController.doGet(request, response);
 
-        verify(response).sendError(HttpServletResponse.SC_NOT_FOUND, "User not found");
+        verify(response).sendError(HttpServletResponse.SC_NOT_FOUND, "Tag not found");
     }
 
     @Test
-    void testDoPutUpdateNonExistentUser() throws Exception {
+    void testDoPutUpdateNonExistentTag() throws Exception {
         HttpServletRequest request = mock(HttpServletRequest.class);
         HttpServletResponse response = mock(HttpServletResponse.class);
 
-        UserDTO userDTO = new UserDTO();
-        userDTO.setId(1L);
-        userDTO.setName("SetUsername");
-        String json = new ObjectMapper().writeValueAsString(userDTO);
+        TagDTO tagDTO = new TagDTO();
+        tagDTO.setId(1L);
+        tagDTO.setName("SetTagName");
+        String json = new ObjectMapper().writeValueAsString(tagDTO);
         ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(json.getBytes());
 
         ServletInputStream servletInputStream = new ServletInputStream() {
@@ -461,70 +461,70 @@ public class UserControllerTest {
         };
 
         doReturn(servletInputStream).when(request).getInputStream();
-        when(userService.getUserById(anyLong())).thenReturn(null);
+        when(tagService.getTagById(anyLong())).thenReturn(null);
 
-        userController.doPut(request, response);
+        tagController.doPut(request, response);
 
-        verify(response).sendError(HttpServletResponse.SC_NOT_FOUND, "User not found");
+        verify(response).sendError(HttpServletResponse.SC_NOT_FOUND, "Tag not found");
     }
 
     @Test
-    void testUserConstructorAndToString() {
+    void testTagConstructorAndToString() {
         Long id = 1L;
-        String name = "Test User";
+        String name = "Test Tag";
         Task task1 = new Task(1L, "Task1", "Description1", 1L, null);
         Task task2 = new Task(2L, "Task2", "Description2", 2L, null);
         List<Task> tasks = Arrays.asList(task1, task2);
 
-        User user = new User(id, name, tasks);
+        Tag tag = new Tag(id, name, tasks);
 
-        assertEquals(id, user.getId());
-        assertEquals(name, user.getName());
-        assertEquals(tasks, user.getTasks());
+        assertEquals(id, tag.getId());
+        assertEquals(name, tag.getName());
+        assertEquals(tasks, tag.getTasks());
 
-        String expectedToString = "User{" + "id=" + id + ", name='" + name + '\'' + ", tasks=" + tasks + '}';
+        String expectedToString = "Tag{" + "id=" + id + ", name='" + name + '\'' + ", tasks=" + tasks + '}';
 
-        assertEquals(expectedToString, user.toString());
+        assertEquals(expectedToString, tag.toString());
     }
 
     @Test
-    void testUserDTOConstructorAndToString() {
+    void testTagDTOConstructorAndToString() {
         Long id = 1L;
-        String name = "Test User";
+        String name = "Test Tag";
         TaskDTO task1 = new TaskDTO(1L, "Task1", "Description1", 1L, null);
         TaskDTO task2 = new TaskDTO(2L, "Task2", "Description2", 2L, null);
         List<TaskDTO> tasks = Arrays.asList(task1, task2);
 
-        UserDTO userDTO = new UserDTO(id, name, tasks);
+        TagDTO tagDTO = new TagDTO(id, name, tasks);
 
-        assertEquals(id, userDTO.getId());
-        assertEquals(name, userDTO.getName());
-        assertEquals(tasks, userDTO.getTasks());
+        assertEquals(id, tagDTO.getId());
+        assertEquals(name, tagDTO.getName());
+        assertEquals(tasks, tagDTO.getTasks());
 
-        String expectedToString = "UserDTO{" + "id=" + id + ", name='" + name + '\'' + ", tasks=" + tasks + '}';
+        String expectedToString = "TagDTO{" + "id=" + id + ", name='" + name + '\'' + ", tasks=" + tasks + '}';
 
-        assertEquals(expectedToString, userDTO.toString());
+        assertEquals(expectedToString, tagDTO.toString());
     }
 
     @Test
-    void testUserMapperPutNull() {
-        UserMapper userMapper = new UserMapperImpl();
-        User user = null;
-        assertNull(userMapper.toDTO(user));
-        User user2 = new User(2L, "", null);
-        assertNull(userMapper.toDTO(user2));
+    void testTagMapperPutNull() {
+        TagMapper tagMapper = new TagMapperImpl();
+        Tag tag = null;
+        assertNull(tagMapper.toDTO(tag));
+        Tag tag2 = new Tag(2L, "", null);
+        assertNull(tagMapper.toDTO(tag2));
 
-        UserDTO userDTO = null;
-        assertNull(userMapper.toEntity(userDTO));
-        UserDTO userDTO2 = new UserDTO(2L, "", null);
-        assertNull(userMapper.toEntity(userDTO2));
+        TagDTO tagDTO = null;
+        assertNull(tagMapper.toEntity(tagDTO));
+        TagDTO tagDTO2 = new TagDTO(2L, "", null);
+        assertNull(tagMapper.toEntity(tagDTO2));
     }
 
     @Test
     public void testHandleErrorSendsError() throws IOException {
         HttpServletResponse resp = mock(HttpServletResponse.class);
 
-        userController.handleError(resp, HttpServletResponse.SC_BAD_REQUEST, "Bad Request");
+        tagController.handleError(resp, HttpServletResponse.SC_BAD_REQUEST, "Bad Request");
 
         verify(resp).sendError(HttpServletResponse.SC_BAD_REQUEST, "Bad Request");
     }
@@ -534,7 +534,7 @@ public class UserControllerTest {
         HttpServletResponse resp = mock(HttpServletResponse.class);
         doThrow(new IOException("Network error")).when(resp).sendError(HttpServletResponse.SC_BAD_REQUEST, "Bad Request");
 
-        userController.handleError(resp, HttpServletResponse.SC_BAD_REQUEST, "Bad Request");
+        tagController.handleError(resp, HttpServletResponse.SC_BAD_REQUEST, "Bad Request");
 
         verify(resp).sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "An unexpected error occurred");
     }
@@ -543,7 +543,7 @@ public class UserControllerTest {
     public void testHandleSendErrorExceptionSendsError() throws IOException {
         HttpServletResponse resp = mock(HttpServletResponse.class);
 
-        userController.handleSendErrorException(HttpServletResponse.SC_NOT_FOUND, "Not Found", resp);
+        tagController.handleSendErrorException(HttpServletResponse.SC_NOT_FOUND, "Not Found", resp);
 
         verify(resp).sendError(HttpServletResponse.SC_NOT_FOUND, "Not Found");
     }
@@ -553,50 +553,50 @@ public class UserControllerTest {
         HttpServletResponse resp = mock(HttpServletResponse.class);
         doThrow(new IOException("Network error")).when(resp).sendError(HttpServletResponse.SC_NOT_FOUND, "Not Found");
 
-        userController.handleSendErrorException(HttpServletResponse.SC_NOT_FOUND, "Not Found", resp);
+        tagController.handleSendErrorException(HttpServletResponse.SC_NOT_FOUND, "Not Found", resp);
 
         verify(resp).sendError(HttpServletResponse.SC_NOT_FOUND, "Not Found");
     }
 
     @Test
-    public void testHandleGetUserByIdUserNotFound() throws IOException {
+    public void testHandleGetTagByIdTagNotFound() throws IOException {
         HttpServletResponse resp = mock(HttpServletResponse.class);
-        when(userService.getUserById(1L)).thenReturn(null);
+        when(tagService.getTagById(1L)).thenReturn(null);
 
-        userController.handleGetUserById("/1", resp);
+        tagController.handleGetTagById("/1", resp);
 
-        verify(resp).sendError(HttpServletResponse.SC_NOT_FOUND, "User not found");
+        verify(resp).sendError(HttpServletResponse.SC_NOT_FOUND, "Tag not found");
     }
 
     @Test
-    public void testHandleGetUserByIdInvalidPath() throws IOException {
+    public void testHandleGetTagByIdInvalidPath() throws IOException {
         HttpServletResponse resp = mock(HttpServletResponse.class);
 
-        userController.handleGetUserById("/", resp);
+        tagController.handleGetTagById("/", resp);
 
         verify(resp).sendError(HttpServletResponse.SC_BAD_REQUEST, "Invalid path length");
     }
 
     @Test
-    public void testHandleGetUserByIdInvalidIdFormat() throws IOException {
+    public void testHandleGetTagByIdInvalidIdFormat() throws IOException {
         HttpServletResponse resp = mock(HttpServletResponse.class);
 
-        userController.handleGetUserById("/invalid", resp);
+        tagController.handleGetTagById("/invalid", resp);
 
-        verify(resp).sendError(HttpServletResponse.SC_BAD_REQUEST, "Invalid user ID format");
+        verify(resp).sendError(HttpServletResponse.SC_BAD_REQUEST, "Invalid tag ID format");
     }
 
     @Test
     void testHandleJsonException() throws IOException {
         Exception exception = new RuntimeException("Test exception");
-        userController.handleJsonException(exception, resp);
+        tagController.handleJsonException(exception, resp);
         verify(resp).sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Error processing JSON");
     }
 
     @Test
     void testHandleIOException() throws IOException {
         IOException ioException = new IOException("Test IO exception");
-        userController.handleIOException(ioException, resp);
+        tagController.handleIOException(ioException, resp);
         verify(resp).sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Error handling request");
     }
 
@@ -607,8 +607,8 @@ public class UserControllerTest {
         HttpServletResponse resp = Mockito.mock(HttpServletResponse.class);
 
         when(req.getPathInfo()).thenReturn("/invalid-id");
-        userController.doDelete(req, resp);
-        verify(resp).sendError(HttpServletResponse.SC_BAD_REQUEST, "Invalid user ID format");
+        tagController.doDelete(req, resp);
+        verify(resp).sendError(HttpServletResponse.SC_BAD_REQUEST, "Invalid tag ID format");
     }
 
     @Test
@@ -618,8 +618,8 @@ public class UserControllerTest {
         HttpServletResponse resp = Mockito.mock(HttpServletResponse.class);
 
         when(req.getPathInfo()).thenReturn("/1");
-        doThrow(new ServiceException("Service error")).when(userService).deleteUser(anyLong());
-        userController.doDelete(req, resp);
-        verify(resp).sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Failed to delete user");
+        doThrow(new ServiceException("Service error")).when(tagService).deleteTag(anyLong());
+        tagController.doDelete(req, resp);
+        verify(resp).sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Failed to delete tag");
     }
 }

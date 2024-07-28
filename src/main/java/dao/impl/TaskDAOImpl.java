@@ -1,10 +1,14 @@
 package dao.impl;
 
 import dao.TaskDAO;
+import entity.Tag;
 import entity.Task;
 import exception.DatabaseOperationException;
 import exception.SQLExceptionWrapper;
+import exception.TaskAssignmentException;
+import exception.TaskRetrievalException;
 import factory.Factory;
+import factory.impl.TagFactoryImpl;
 import factory.impl.TaskFactoryImpl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -26,6 +30,7 @@ public class TaskDAOImpl implements TaskDAO {
     private final Connection connection;
     private final Factory<Task> taskFactory = new TaskFactoryImpl();
     private static final Logger LOGGER = LoggerFactory.getLogger(TaskDAOImpl.class);
+    private final Factory<Tag> tagsFactory = new TagFactoryImpl();
 
     public TaskDAOImpl(Connection connection) {
         this.connection = connection;
@@ -183,6 +188,48 @@ public class TaskDAOImpl implements TaskDAO {
         } finally {
             restoreAutoCommitState(commitSuccessful);
         }
+    }
+
+    @Override
+    public void assignTagToTask(Long taskId, Long tagId) {
+        String checkSql = "SELECT COUNT(*) FROM task_tag WHERE task_id = ? AND tag_id = ?";
+        try (PreparedStatement checkStmt = connection.prepareStatement(checkSql)) {
+            checkStmt.setLong(1, tagId);
+            checkStmt.setLong(2, tagId);
+            try (ResultSet rs = checkStmt.executeQuery()) {
+                if (rs.next() && rs.getInt(1) > 0) {
+                    return;
+                }
+            }
+        } catch (SQLException e) {
+            throw new TaskAssignmentException("Error checking tags assignment", e);
+        }
+
+        String insertSql = "INSERT INTO task_tag (task_id, tag_id) VALUES (?, ?)";
+        try (PreparedStatement insertStmt = connection.prepareStatement(insertSql)) {
+            insertStmt.setLong(1, taskId);
+            insertStmt.setLong(2, tagId);
+            insertStmt.executeUpdate();
+        } catch (SQLException e) {
+            throw new TaskAssignmentException("Error assigning tag to task", e);
+        }
+    }
+
+    @Override
+    public List<Tag> getTagsByTaskId(Long taskId) {
+        List<Tag> tags = new ArrayList<>();
+        String sql = "SELECT t.id, t.name FROM tags t JOIN task_tag ut ON t.id = ut.tag_id WHERE ut.task_id = ?";
+        try (PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setLong(1, taskId);
+            try (ResultSet resultSet = statement.executeQuery()) {
+                while (resultSet.next()) {
+                    TagDAOImpl.tagsSetList(resultSet, tags, tagsFactory);
+                }
+            }
+        } catch (SQLException e) {
+            throw new TaskRetrievalException("Error retrieving tags for task ID: " + taskId, e);
+        }
+        return tags;
     }
 
     static void tasksSetList(ResultSet resultSet, List<Task> tasks, Factory<Task> taskFactory) throws SQLException {
